@@ -5,8 +5,8 @@ FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS packages
 COPY .gitconfig $HOME/.gitconfig
 RUN npm install -g yarn
 RUN echo backstage | npx @backstage/create-app
-COPY package.json yarn.lock /opt/app-root/src/
-COPY packages /opt/app-root/src/packages
+COPY backstage/package.json backstage/yarn.lock /opt/app-root/src/
+COPY backstage/packages /opt/app-root/src/packages
 
 USER 0
 
