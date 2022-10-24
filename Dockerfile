@@ -5,8 +5,6 @@ FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS packages
 COPY .gitconfig $HOME/.gitconfig
 RUN npm install -g yarn
 RUN echo backstage | npx @backstage/create-app
-COPY backstage/package.json backstage/yarn.lock /opt/app-root/src/
-COPY backstage/packages /opt/app-root/src/packages
 
 USER 0
 
@@ -16,7 +14,7 @@ RUN chgrp -R 0 /opt/app-root/src && \
 USER 1001
 
 RUN fix-permissions ./ && \
-    find packages -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
+    find backstage -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
 
 # Stage 2 - Install dependencies and build packages
 FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS build
