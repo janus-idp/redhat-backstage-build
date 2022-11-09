@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -e
+echo "--> Running app with production configuration"
+node packages/backend --config /config/app-config.yaml

@@ -1,0 +1,36 @@
+#!/bin/bash
+echo "---> Adding yarn to the image"
+npm install -g yarn
+
+set -e
+
+shopt -s dotglob
+if [ -d /tmp/artifacts ] && [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
+    echo "---> Restoring previous build artifacts ..."
+    mv -T --verbose /tmp/artifacts/node_modules "${HOME}/node_modules"
+fi
+
+echo "---> Installing application source ..."
+mv /tmp/src/* ./
+
+# Fix source directory permissions
+fix-permissions ./
+echo "---> Building in production mode"
+yarn install --frozen-lockfile --network-timeout 300000
+yarn tsc
+yarn --cwd packages/backend build
+cp packages/backend/dist/skeleton.tar.gz ./
+tar xzf skeleton.tar.gz && rm skeleton.tar.gz
+
+echo "---> Clean up after build"
+yarn install --frozen-lockfile --production --network-timeout 300000
+rm -rf "$(yarn cache dir)"
+yarn cache clean
+rm -rf .cache
+
+echo "---> Copying build bundle"
+cp packages/backend/dist/bundle.tar.gz ./
+
+tar xzf bundle.tar.gz && rm bundle.tar.gz
+# Fix source directory permissions
+fix-permissions ./
