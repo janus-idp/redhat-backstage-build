@@ -36,7 +36,7 @@ IMAGE=<target_image_tag>
 
 s2i build \
   $BACKSTAGE_LOCATION \
-  --scripts-url https://raw.githubusercontent.com/redhat-developer/redhat-backstage-build/main/.s2i/bin/ \
+  --scripts-url https://raw.githubusercontent.com/janus-idp/redhat-backstage-build/main/.s2i/bin/ \
   registry.access.redhat.com/ubi9/nodejs-16:latest \
   $IMAGE
 ```
@@ -50,7 +50,7 @@ IMAGE=<target_image_tag>
 tmp_dir=$(mktemp -d)
 s2i build \
   $BACKSTAGE_LOCATION \
-  --scripts-url https://raw.githubusercontent.com/redhat-developer/redhat-backstage-build/main/.s2i/bin/ \
+  --scripts-url https://raw.githubusercontent.com/janus-idp/redhat-backstage-build/main/.s2i/bin/ \
   registry.access.redhat.com/ubi9/nodejs-16:latest \
   --as-dockerfile ${tmp_dir}/Containerfile
 
