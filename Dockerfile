@@ -1,10 +1,10 @@
 # Stage 1 - Create yarn install skeleton layer
 FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS packages
 
-#WORKDIR /app
-COPY package.json yarn.lock ./
-
-COPY packages packages
+#WORKDIR /tmp
+COPY .gitconfig $HOME/.gitconfig
+RUN npm install -g yarn
+RUN echo backstage | npx @backstage/create-app
 
 USER 0
 
@@ -13,9 +13,8 @@ RUN chgrp -R 0 /opt/app-root/src && \
 
 USER 1001
 
-RUN npm install -g yarn && \
-    fix-permissions ./ && \
-    find packages -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
+RUN fix-permissions ./ && \
+    find backstage -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
 
 # Stage 2 - Install dependencies and build packages
 FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS build
