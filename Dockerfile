@@ -1,5 +1,5 @@
 # Stage 1 - Create yarn install skeleton layer
-FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS packages
+FROM registry.access.redhat.com/ubi9/nodejs-18:latest AS packages
 
 #WORKDIR /app
 COPY package.json yarn.lock ./
@@ -18,7 +18,7 @@ RUN npm install -g yarn && \
     find packages -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
 
 # Stage 2 - Install dependencies and build packages
-FROM registry.access.redhat.com/ubi9/nodejs-16:latest AS build
+FROM registry.access.redhat.com/ubi9/nodejs-18:latest AS build
 
 COPY --from=packages /opt/app-root/src .
 
@@ -38,7 +38,7 @@ RUN yarn tsc
 RUN yarn --cwd packages/backend build
 
 # Stage 3 - Build the actual backend image and install production dependencies
-FROM registry.access.redhat.com/ubi9/nodejs-16-minimal:latest
+FROM registry.access.redhat.com/ubi9/nodejs-18-minimal:latest
 
 USER 0
 
