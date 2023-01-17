@@ -9,16 +9,7 @@ on:
       build_platforms:
         required: true
         type: string
-      image_registry:
-        required: true
-        type: string
     outputs:
-      repository_name:
-        value: ${{ jobs.setup.outputs.repository_name }}
-      image_repository:
-        value: ${{ jobs.setup.outputs.image_repository }}
-      image_registry:
-        value: ${{ jobs.setup.outputs.image_registry }}
       image_tag:
         value: ${{ jobs.setup.outputs.image_tag }}
       dist_matrix:
@@ -33,10 +24,6 @@ jobs:
       - name: Setup Workflow Variables
         id: set-variables
         run: |
-          echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_OUTPUT
-          echo "IMAGE_REPOSITORY=${{ inputs.image_registry }}/$GITHUB_REPOSITORY" >> $GITHUB_OUTPUT
-          echo "IMAGE_REGISTRY=${{ inputs.image_registry }}" >> $GITHUB_OUTPUT
-
           # Set versions based on presence of tag
           if [[ "${{ github.ref }}" =~ ^refs/tags/ ]]; then
             echo "IMAGE_TAG=$(echo ${GITHUB_REF/refs\/tags\//})" >> $GITHUB_OUTPUT
@@ -50,9 +37,6 @@ jobs:
           echo "IMAGE_PLATFORM_TAGS=$(echo ${{ inputs.build_platforms }} | sed  -e 's/,/ /g' -e 's/\//-/g')" >> $GITHUB_OUTPUT
 
     outputs:
-      repository_name: ${{ steps.set-variables.outputs.REPOSITORY_NAME }}
-      image_repository: ${{ steps.set-variables.outputs.IMAGE_REPOSITORY }}
-      image_registry: ${{ steps.set-variables.outputs.IMAGE_REGISTRY }}
       image_tag: ${{ steps.set-variables.outputs.IMAGE_TAG}}
       dist_matrix: ${{ steps.set-variables.outputs.DIST_MATRIX }}
       image_platform_tags: ${{ steps.set-variables.outputs.IMAGE_PLATFORM_TAGS }}
