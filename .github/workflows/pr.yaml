@@ -4,40 +4,13 @@ on:
     branches:
       - main
 
-env:
-  DEFAULT_TAG_VERSION: "latest"
-  BUILD_PLATFORMS: "linux/amd64,linux/arm64"
-  IMAGE_REGISTRY: "ghcr.io"
-
 jobs:
   setup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Workflow Variables
-        id: set-variables
-        run: |
-          echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_OUTPUT
-          echo "IMAGE_REPOSITORY=${{ env.IMAGE_REGISTRY}}/$GITHUB_REPOSITORY" >> $GITHUB_OUTPUT
-
-          # Set versions based on presence of tag
-          if [[ "${{ github.ref }}" =~ ^refs/tags/ ]]; then
-            echo "IMAGE_TAG=$(echo ${GITHUB_REF/refs\/tags\//})" >> $GITHUB_OUTPUT
-          else
-            echo "IMAGE_TAG=${DEFAULT_TAG_VERSION}" >> $GITHUB_OUTPUT
-          fi
-
-          # Create Distribution Matrix
-          echo "DIST_MATRIX=$(echo -n "$BUILD_PLATFORMS" | jq -csR '. | split(",")')" >> $GITHUB_OUTPUT
-          # Create Image Tags
-          echo "IMAGE_PLATFORM_TAGS=$(echo $BUILD_PLATFORMS | sed  -e 's/,/ /g' -e 's/\//-/g')" >> $GITHUB_OUTPUT
-
-    outputs:
-      repository_name: ${{ steps.set-variables.outputs.REPOSITORY_NAME }}
-      image_repository: ${{ steps.set-variables.outputs.IMAGE_REPOSITORY }}
-      image_tag: ${{ steps.set-variables.outputs.IMAGE_TAG}}
-      dist_matrix: ${{ steps.set-variables.outputs.DIST_MATRIX }}
-      image_platform_tags: ${{ steps.set-variables.outputs.IMAGE_PLATFORM_TAGS }}
-
+    uses: ./.github/workflows/setup.yaml
+    with:
+      default_tag_version: "latest"
+      build_platforms: "linux/amd64,linux/arm64"
+      image_registry: "ghcr.io"
 
   build:
     runs-on: ubuntu-latest
@@ -64,7 +37,7 @@ jobs:
       - name: Docker Login
         uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a #pin@v2.1.0
         with:
-          registry: ${{ env.IMAGE_REGISTRY }}
+          registry: ${{ needs.setup.outputs.image_registry }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
