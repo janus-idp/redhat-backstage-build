@@ -1,5 +1,8 @@
-node_modules
-packages/*/dist
-packages/*/node_modules
-plugins/*/dist
-plugins/*/node_modules
+.yarn/*
+**/dist
+**/node_modules
+plugins
+*.local.yaml
+coverage
+dist-types
+examples
