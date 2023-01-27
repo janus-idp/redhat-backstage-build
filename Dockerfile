@@ -50,7 +50,7 @@ COPY --from=build /opt/app-root/src/yarn.lock /opt/app-root/src/package.json /op
 RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 
 # Install production dependencies
-RUN yarn install --frozen-lockfile --production && yarn cache clean
+RUN yarn install --frozen-lockfile --production --network-timeout 600000 && yarn cache clean
 
 # Copy the built packages from the build stage
 COPY --from=build /opt/app-root/src/packages/backend/dist/bundle.tar.gz .
