@@ -13,7 +13,7 @@ COPY ./packages ./packages
 # Remove all files except package.json
 RUN find packages -mindepth 2 -maxdepth 2 \! -name "package.json" -exec rm -rf {} \+
 
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --network-timeout 600000
 
 # Stage 2 - Build packages
 FROM registry.access.redhat.com/ubi9/nodejs-18:latest AS build
