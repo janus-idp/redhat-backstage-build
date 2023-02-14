@@ -6,26 +6,31 @@ on:
     tags:
       - v*
 
+env:
+  MAIN_REGISTRY: ghcr.io
+  MAIN_USERNAME: ${{ github.actor }}
+  MAIN_PASSWORD: ${{ github.token }}
+  MAIN_REPOSITORY: ${{ github.repository }}
+
 jobs:
   setup:
     uses: ./.github/workflows/setup.yaml
     with:
       default_tag_version: "latest"
       build_platforms: "linux/amd64,linux/arm64"
-      image_registry: "ghcr.io"
 
-  build:
+  build-and-push-images:
     runs-on: ubuntu-latest
     needs: ["setup"]
     strategy:
       matrix:
         platform: ${{ fromJson(needs.setup.outputs.dist_matrix) }}
+
     steps:
       - name: Setup Job Variables
         id: set-build-variables
         run: |
-          echo "PLATFORM_OS=$(echo ${{ matrix.platform }} |  cut -d/ -f1)" >> $GITHUB_OUTPUT
-          echo "PLATFORM_ARCH=$(echo ${{ matrix.platform }} |  cut -d/ -f2)" >> $GITHUB_OUTPUT
+          echo "PLATFORM_DASH=$(echo ${{ matrix.platform }} | sed -e 's/\//-/g')" >> $GITHUB_OUTPUT
 
       - name: checkout repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # pin@v3
@@ -36,28 +41,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8c0edbc76e98fa90f69d9a2c020dcb50019dc325 #pin@v2.2.1
 
-      - name: Docker Login
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a #pin@v2.1.0
-        with:
-          registry: ${{ needs.setup.outputs.image_registry }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/setup-node@8c91899e586c5b171469028077307d293428b516 #pin@v3.5.1
         with:
           node-version: 18
-
-      - name: Setup git
-        run: |
-          git config --global user.name "$GITHUB_ACTOR"
-          git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Create Backstage application
         run: |
           echo backstage | npx @backstage/create-app
           cp ./Dockerfile ./.dockerignore ./backstage/
 
-      - name: Build container image and push
+      - name: Log in to Registry
+        uses: redhat-actions/podman-login@632d91dfe19e1b55833cb708786bfbad2c2a0335 #pin@v3.2.0
+        with:
+          registry: ${{ env.MAIN_REGISTRY }}
+          username: ${{ env.MAIN_USERNAME }}
+          password: ${{ env.MAIN_PASSWORD }}
+
+      - name: Build container image
         uses: docker/build-push-action@37abcedcc1da61a57767b7588cb9d03eb57e28b3 #pin@v3.3.0
         with:
           context: backstage
@@ -66,33 +66,78 @@ jobs:
           provenance: false
           push: true
           tags: |
-            ${{ needs.setup.outputs.image_repository }}:latest-${{ steps.set-build-variables.outputs.PLATFORM_OS }}-${{ steps.set-build-variables.outputs.PLATFORM_ARCH }}
-            ${{ needs.setup.outputs.image_repository }}:${{ needs.setup.outputs.image_tag }}-${{ steps.set-build-variables.outputs.PLATFORM_OS }}-${{ steps.set-build-variables.outputs.PLATFORM_ARCH }}
+            ${{ env.MAIN_REGISTRY }}/${{ env.MAIN_REPOSITORY }}:latest-${{ steps.set-build-variables.outputs.PLATFORM_DASH }}
+            ${{ env.MAIN_REGISTRY }}/${{ env.MAIN_REPOSITORY }}:${{ needs.setup.outputs.image_tag }}-${{ steps.set-build-variables.outputs.PLATFORM_DASH }}
 
-  process-image-manifest:
+  mirror-images-and-create-manifests:
     runs-on: ubuntu-latest
-    name: process-image-manifest
-    needs: ["setup", "build"]
+    needs: ["setup", "build-images"]
+    strategy:
+      matrix:
+        include:
+          - registry: ghcr.io
+            username: ${{ github.actor }}
+            password: GITHUB_TOKEN
+            repository: ${{ github.repository }}
+          - registry: quay.io
+            username: ${{ vars.QUAY_USERNAME }}
+            password: QUAY_TOKEN
+            repository: janus-idp/redhat-backstage-build
+
     steps:
-      - name: Log in to Registry
+      - name: Log in to Registry to pull images
         uses: redhat-actions/podman-login@632d91dfe19e1b55833cb708786bfbad2c2a0335 #pin@v3.2.0
         with:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          registry: ${{ needs.setup.outputs.image_registry }}
-      - name: "Append to Bundle Image Manifest"
+          registry: ${{ env.MAIN_REGISTRY }}
+          username: ${{ env.MAIN_USERNAME }}
+          password: ${{ env.MAIN_PASSWORD }}
+
+      - name: Import Docker images
+        run: |
+          for PLATFORM in ${{ needs.setup.outputs.image_platform_tags }}; do \
+            PLATFORM_SLASH=$(echo $PLATFORM | sed -e 's/-/\//g')
+            for TAG in latest ${{ needs.setup.outputs.image_tag }}; do \
+              docker pull --platform $PLATFORM_SLASH ${{ env.MAIN_REGISTRY }}/${{ env.MAIN_REPOSITORY }}:$TAG-$PLATFORM
+            done
+          done
+
+      - name: Log out of registry
         shell: bash
         run: |
-          TAGS="latest" 
+          podman logout ${{ env.MAIN_REGISTRY }}
 
+      - name: Log in to Registry to push images
+        uses: redhat-actions/podman-login@632d91dfe19e1b55833cb708786bfbad2c2a0335 #pin@v3.2.0
+        with:
+          registry: ${{ matrix.registry }}
+          username: ${{ matrix.username }}
+          password: ${{ secrets[matrix.password] }}
+
+      - name: Mirror images
+        shell: bash
+        run: |
+          IMAGE_REPOSITORY="${{ matrix.registry }}/${{ matrix.repository }}"
+
+          for PLATFORM in ${{ needs.setup.outputs.image_platform_tags }}; do \
+            for TAG in latest ${{ needs.setup.outputs.image_tag }}; do \
+              docker tag ${{ env.MAIN_REGISTRY }}/${{ env.MAIN_REPOSITORY }}:$TAG-$PLATFORM $IMAGE_REPOSITORY:$TAG-$PLATFORM
+              docker push $IMAGE_REPOSITORY:$TAG-$PLATFORM
+            done
+          done
+
+      - name: Create and push manifests
+        shell: bash
+        run: |
+          IMAGE_REPOSITORY="${{ matrix.registry }}/${{ matrix.repository }}"
+          TAGS="latest"
           if [[ "${{ needs.setup.outputs.image_tag }}" != "latest" ]]; then
             TAGS="$TAGS ${{ needs.setup.outputs.image_tag }}"
           fi
 
           for TAG in $TAGS; do \
-            podman manifest create ${{ needs.setup.outputs.image_repository }}:$TAG
+            podman manifest create $IMAGE_REPOSITORY:$TAG
             for PLATFORM in ${{ needs.setup.outputs.image_platform_tags }}; do \
-                podman manifest add ${{ needs.setup.outputs.image_repository }}:$TAG docker://${{ needs.setup.outputs.image_repository }}:$TAG-$PLATFORM; \
+                podman manifest add $IMAGE_REPOSITORY:$TAG docker://$IMAGE_REPOSITORY:$TAG-$PLATFORM; \
             done
-            podman manifest push ${{ needs.setup.outputs.image_repository }}:$TAG docker://${{ needs.setup.outputs.image_repository }}:$TAG
+            podman manifest push $IMAGE_REPOSITORY:$TAG docker://$IMAGE_REPOSITORY:$TAG
           done
