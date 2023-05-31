@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: checkout repo
-        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # pin@v3
+        uses: actions/checkout@f095bcc56b7c2baf48f3ac70d6d6782f4f553222 # pin@v3
 
       - uses: actions/setup-node@869f4dd0c7f320ae834c2724d92a364de3893c24 #pin@v3.5.1
         with:
